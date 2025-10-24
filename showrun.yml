@@ -1,0 +1,18 @@
+---
+- name: Backup running config from CSR router
+  hosts: all
+  gather_facts: no
+  connection: network_cli
+
+  tasks:
+    - name: Show running-config from device
+      cisco.ios.ios_command:
+        commands:
+          - show running-config
+      register: config
+
+    - name: Save running-config to local file
+      copy:
+        content: "{{ config.stdout[0] }}"
+        dest: "./show_run_{{ MY_STUDENT_ID }}_{{ ROUTER_NAME }}.txt"
+      delegate_to: localhost
