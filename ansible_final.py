@@ -4,13 +4,16 @@ import subprocess
 # ansible-galaxy collection install cisco.ios
 
 
-def showrun(student_id, router_name="CSR1000v"):
+# --- ★★★[แก้ไข]★★★: เพิ่ม ip_address เป็นพารามิเตอร์
+def showrun(student_id, ip_address, router_name="CSR1000v"):
     # read https://www.datacamp.com/tutorial/python-subprocess to learn more about subprocess
     command = [
         "ansible-playbook",
         "-i",
         "hosts",
         "showrun.yml",
+        "--limit",
+        ip_address,  # <-- ★★★[แก้ไข]★★★: เพิ่ม flag --limit
         "--extra-vars",
         f"MY_STUDENT_ID={student_id}",
         "--extra-vars",
