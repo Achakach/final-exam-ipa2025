@@ -1,14 +1,14 @@
 from netmiko import ConnectHandler
 from pprint import pprint
-# --- ★★★[แก้ไข]★★★: ลบ re ออก เราจะใช้ TextFSM
-# import re
+# --- (ลบ import re) ---
 
 username = "admin"
 password = "cisco"
 
 
-# --- (ฟังก์ชัน gigabit_status เหมือนเดิม ไม่ต้องแก้ไข) ---
+# --- (ฟังก์ชัน gigabit_status เหมือนเดิม) ---
 def gigabit_status(ip_address):
+    # (โค้ดส่วนนี้เหมือนเดิม)
     device_params = {
         "device_type": "cisco_xe",
         "ip": ip_address,
@@ -81,39 +81,40 @@ def get_motd(ip_address):
 
     try:
         with ConnectHandler(**device_params) as ssh:
-            # --- ★★★[แก้ไข]★★★: ใช้คำสั่ง 'show banner motd'
-            command = "show running-config"
-
-            # --- ★★★[แก้ไข]★★★: เปิด 'use_textfsm=True' ตามโจทย์
+            command = "show banner motd"
             result = ssh.send_command(command, use_textfsm=True)
 
             print("--- MOTD DEBUG (TextFSM + show banner motd) ---")
             pprint(result)
             print("----------------------------------------------")
 
-            # --- ★★★[แก้ไข]★★★: ตรวจสอบผลลัพธ์ที่ถูกต้อง (List[Dict])
-            # TextFSM สำหรับ 'show banner motd' จะคืนค่าเป็น List ที่มี Dict 1 ตัว
-            # เช่น: [{'banner': 'motd', 'message': 'Authorized users only!'}]
+            # [ 1. กรณีที่ TextFSM ทำงานสำเร็จ (ได้ List[Dict]) ]
             if (
                 isinstance(result, list)
                 and len(result) > 0
                 and isinstance(result[0], dict)
             ):
                 banner_dict = result[0]
-
-                # ตรวจสอบว่า key 'message' (จาก template) มีอยู่หรือไม่
                 if "message" in banner_dict:
                     motd_message = banner_dict.get("message")
-                    return motd_message.strip()  # .strip() เผื่อมี \n
+                    return motd_message.strip()
                 else:
-                    # ถ้าได้ List[Dict] แต่ไม่มี key 'message' (อาจจะไม่มี MOTD)
                     return f"No MOTD banner is set on {ip_address}."
 
-            # --- ถ้า TextFSM คืนค่าว่างเปล่า (กรณีไม่มี banner motd) ---
-            elif isinstance(result, str) and not result:
+            # [ 2. กรณีที่ TextFSM ทำงานสำเร็จ แต่ไม่พบ MOTD (ได้ List ว่าง) ]
+            elif isinstance(result, list) and len(result) == 0:
                 return f"No MOTD banner is set on {ip_address}."
 
-            # --- ถ้าโครงสร้างไม่ตรง (เช่น ได้ raw text กลับมา) ---
+            # [ 3. ★★★ เพิ่มใหม่: กรณี TextFSM ล้มเหลว แต่ส่ง Raw String กลับมา (มีข้อความ) ★★★ ]
+            elif isinstance(result, str) and result.strip():
+                # ถ้าผลลัพธ์เป็น String ที่มีเนื้อหา ให้ใช้ String นั้นเลย
+                return result.strip()
+
+            # [ 4. กรณี TextFSM ล้มเหลว และส่ง String ว่างกลับมา ]
+            elif isinstance(result, str) and not result.strip():
+                return f"No MOTD banner is set on {ip_address}."
+
+            # [ 5. กรณีอื่นๆ ที่ไม่คาดคิด ]
             else:
                 return f"Error: Could not parse output from {ip_address} (Unexpected TextFSM output)."
 
@@ -121,6 +122,3 @@ def get_motd(ip_address):
         error_message = f"An unexpected error occurred in get_motd on {ip_address}: {e}"
         pprint(error_message)
         return error_message
-
-
-# --- ★★★[สิ้นสุดการแก้ไข]★★★
