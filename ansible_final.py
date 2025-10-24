@@ -1,5 +1,5 @@
 import subprocess
-
+import json
 # sudo apt install ansible
 # ansible-galaxy collection install cisco.ios
 
@@ -33,19 +33,23 @@ def showrun(student_id, ip_address, router_name="CSR1000v"):
 def set_motd(student_id, ip_address, motd_message):
     """
     Calls the Ansible playbook to set the MOTD banner.
+    Uses JSON for extra-vars to safely handle spaces.
     """
+
+    # --- ★★★[แก้ไข]★★★: สร้าง JSON string สำหรับ --extra-vars
+    extra_vars = json.dumps({"MOTD_MESSAGE": motd_message, "MY_STUDENT_ID": student_id})
+
     command = [
         "ansible-playbook",
         "-i",
         "hosts",
-        "set_motd.yml",  # <-- ★★★ เรียก Playbook ใหม่
+        "set_motd.yml",
         "--limit",
         ip_address,
         "--extra-vars",
-        f"MY_STUDENT_ID={student_id}",  # (เผื่อไว้ แม้ Playbook นี้ไม่ได้ใช้)
-        "--extra-vars",
-        f"MOTD_MESSAGE={motd_message}",  # <-- ★★★ ส่งข้อความ MOTD เข้าไป
+        extra_vars,  # <-- ★★★[แก้ไข]★★★: ส่ง JSON string ที่สร้างไว้
     ]
+
     result = subprocess.run(command, capture_output=True, text=True)
     output_log = f"{result.stdout}\n{result.stderr}"
     print("--- ANSIBLE (set_motd) OUTPUT ---")
