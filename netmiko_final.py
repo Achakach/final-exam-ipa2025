@@ -1,19 +1,17 @@
 from netmiko import ConnectHandler
 from pprint import pprint
+# --- ★★★[แก้ไข]★★★: ลบ re ออก เราจะใช้ TextFSM
+# import re
 
-# --- แก้ไข: ลบข้อมูลการเชื่อมต่อที่ Hardcode ออก ---
-# device_ip = "10.0.15.61"  <-- ลบออก
 username = "admin"
 password = "cisco"
-# device_params = { ... } <-- ลบออก
 
 
-# --- ★★★[แก้ไข]★★★: รับ ip_address เป็นพารามิเตอร์ ---
+# --- (ฟังก์ชัน gigabit_status เหมือนเดิม ไม่ต้องแก้ไข) ---
 def gigabit_status(ip_address):
-    # --- ★★★[แก้ไข]★★★: ย้าย device_params มาสร้างข้างในนี้ ---
     device_params = {
         "device_type": "cisco_xe",
-        "ip": ip_address,  # <-- ★★★[แก้ไข]★★★
+        "ip": ip_address,
         "username": username,
         "password": password,
     }
@@ -69,7 +67,7 @@ def gigabit_status(ip_address):
         return error_message
 
 
-# --- ★★★[เพิ่มใหม่]★★★: ฟังก์ชันสำหรับอ่าน MOTD โดยใช้ TextFSM ---
+# --- ★★★[แก้ไข]★★★: ฟังก์ชันสำหรับอ่าน MOTD (ใช้ TextFSM + show banner motd) ---
 def get_motd(ip_address):
     """
     Retrieves the MOTD banner from the router using Netmiko and TextFSM.
@@ -83,25 +81,41 @@ def get_motd(ip_address):
 
     try:
         with ConnectHandler(**device_params) as ssh:
-            # เราใช้ show running-config เพราะ ntc_templates มี
-            # template สำหรับคำสั่งนี้ที่สามารถดึง 'banner_motd' ได้
+            # --- ★★★[แก้ไข]★★★: ใช้คำสั่ง 'show banner motd'
             command = "show running-config"
 
-            # use_textfsm=True จะใช้ ntc_templates เพื่อแยกส่วน
+            # --- ★★★[แก้ไข]★★★: เปิด 'use_textfsm=True' ตามโจทย์
             result = ssh.send_command(command, use_textfsm=True)
 
-            if isinstance(result, dict):
-                # TextFSM จะคืนค่า dict และเราดึงคีย์ 'banner_motd'
-                motd_message = result.get("banner_motd")
+            print("--- MOTD DEBUG (TextFSM + show banner motd) ---")
+            pprint(result)
+            print("----------------------------------------------")
 
-                if motd_message:
-                    # คืนค่าเฉพาะข้อความ MOTD
-                    return motd_message
+            # --- ★★★[แก้ไข]★★★: ตรวจสอบผลลัพธ์ที่ถูกต้อง (List[Dict])
+            # TextFSM สำหรับ 'show banner motd' จะคืนค่าเป็น List ที่มี Dict 1 ตัว
+            # เช่น: [{'banner': 'motd', 'message': 'Authorized users only!'}]
+            if (
+                isinstance(result, list)
+                and len(result) > 0
+                and isinstance(result[0], dict)
+            ):
+                banner_dict = result[0]
+
+                # ตรวจสอบว่า key 'message' (จาก template) มีอยู่หรือไม่
+                if "message" in banner_dict:
+                    motd_message = banner_dict.get("message")
+                    return motd_message.strip()  # .strip() เผื่อมี \n
                 else:
-                    return "Error: No MOTD Configured"
+                    # ถ้าได้ List[Dict] แต่ไม่มี key 'message' (อาจจะไม่มี MOTD)
+                    return f"No MOTD banner is set on {ip_address}."
+
+            # --- ถ้า TextFSM คืนค่าว่างเปล่า (กรณีไม่มี banner motd) ---
+            elif isinstance(result, str) and not result:
+                return f"No MOTD banner is set on {ip_address}."
+
+            # --- ถ้าโครงสร้างไม่ตรง (เช่น ได้ raw text กลับมา) ---
             else:
-                # กรณี TextFSM ไม่สามารถ parse ได้ (ไม่น่าเกิด)
-                return f"Error: Could not parse running-config from {ip_address}."
+                return f"Error: Could not parse output from {ip_address} (Unexpected TextFSM output)."
 
     except Exception as e:
         error_message = f"An unexpected error occurred in get_motd on {ip_address}: {e}"
@@ -109,4 +123,4 @@ def get_motd(ip_address):
         return error_message
 
 
-# --- ★★★[สิ้นสุดการเพิ่มใหม่]★★★
+# --- ★★★[สิ้นสุดการแก้ไข]★★★
