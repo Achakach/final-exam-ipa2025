@@ -41,7 +41,7 @@ print(f"Bot started. Waiting for commands for {MY_STUDENT_ID}...")
 print(f"Current method: {current_method}")
 
 while True:
-    time.sleep(1)
+    time.sleep(0.2)
     getParameters = {"roomId": WEBEX_ROOM_ID, "max": 1}
     getHTTPHeader = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
 
