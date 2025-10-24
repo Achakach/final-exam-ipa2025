@@ -99,11 +99,11 @@ def get_motd(ip_address):
                     motd_message = banner_dict.get("message")
                     return motd_message.strip()
                 else:
-                    return f"No MOTD banner is set on {ip_address}."
+                    return "Error: No MOTD Configured"
 
             # [ 2. กรณีที่ TextFSM ทำงานสำเร็จ แต่ไม่พบ MOTD (ได้ List ว่าง) ]
             elif isinstance(result, list) and len(result) == 0:
-                return f"No MOTD banner is set on {ip_address}."
+                return "Error: No MOTD Configured"
 
             # [ 3. ★★★ เพิ่มใหม่: กรณี TextFSM ล้มเหลว แต่ส่ง Raw String กลับมา (มีข้อความ) ★★★ ]
             elif isinstance(result, str) and result.strip():
@@ -112,7 +112,7 @@ def get_motd(ip_address):
 
             # [ 4. กรณี TextFSM ล้มเหลว และส่ง String ว่างกลับมา ]
             elif isinstance(result, str) and not result.strip():
-                return f"No MOTD banner is set on {ip_address}."
+                return "Error: No MOTD Configured"
 
             # [ 5. กรณีอื่นๆ ที่ไม่คาดคิด ]
             else:

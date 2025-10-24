@@ -11,7 +11,7 @@ import os
 
 from urllib3.util import response
 import netconf_final
-import restconf_final  # <-- ★★★[เพิ่มใหม่]★★★: Import ไฟล์ restconf
+import restconf_final
 
 # --- แก้ไข: เพิ่ม import สำหรับโจทย์ส่วนที่ 2 ---
 import netmiko_final
@@ -218,10 +218,21 @@ while True:
                 elif command_to_run == "gigabit_status":
                     responseMessage = netmiko_final.gigabit_status(ip_address)
 
-                # --- ★★★[เพิ่มใหม่]★★★: เพิ่มการเรียกใช้ motd ---
+                # --- ★★★[แก้ไข]★★★: เปลี่ยน 'motd' ให้เป็นการตั้งค่า (SET) ผ่าน Ansible ---
                 elif command_to_run == "motd":
-                    responseMessage = netmiko_final.get_motd(ip_address)
-                # --- ★★★[สิ้นสุดการเพิ่มใหม่]★★★
+                    # ตรวจสอบว่ามีข้อความ MOTD ตามหลังคำสั่งหรือไม่ (parts[3] ขึ้นไป)
+                    if len(parts) > 3:
+                        # รวมข้อความทั้งหมดตั้งแต่ส่วนที่ 4 (index 3) กลับเป็น String เดียว
+                        motd_message = " ".join(parts[3:])
+
+                        # เรียกใช้ฟังก์ชันใหม่ใน ansible_final
+                        responseMessage = ansible_final.set_motd(
+                            MY_STUDENT_ID, ip_address, motd_message
+                        )
+                    else:
+                        # กรณีพิมพ์แค่ /... <ip> motd แต่ไม่มีข้อความตาม
+                        responseMessage = netmiko_final.get_motd(ip_address)
+                # --- ★★★[สิ้นสุดการแก้ไข]★★★
 
                 # กลุ่มคำสั่ง Ansible
                 elif command_to_run == "showrun":
