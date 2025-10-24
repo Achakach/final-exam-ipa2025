@@ -63,12 +63,14 @@ def create(student_id, ip_address):
     if resp.status_code >= 200 and resp.status_code <= 299:
         print("STATUS OK: {}".format(resp.status_code))
         # --- ★★★[แก้ไข]★★★: ข้อความตอบกลับ ---
-        return f"Interface loopback {student_id} is created successfully"
+        return f"Interface loopback {student_id} is created successfully using restconf"
     else:
         print("Error. Status Code: {}".format(resp.status_code))
         # --- ★★★[เพิ่มใหม่]★★★: จัดการ Error กรณี Interface มีอยู่แล้ว (409 Conflict) ---
         if resp.status_code == 409:
-            return f"Cannot create: Interface loopback {student_id}"
+            return (
+                f"Cannot create: Interface loopback {student_id} (checked by restconf)"
+            )
         return f"Error during create: {resp.text}"
 
 
@@ -88,12 +90,14 @@ def delete(student_id, ip_address):
     if resp.status_code >= 200 and resp.status_code <= 299:
         print("STATUS OK: {}".format(resp.status_code))
         # --- ★★★[แก้ไข]★★★: ข้อความตอบกลับ ---
-        return f"Interface loopback {student_id} is deleted successfully"
+        return f"Interface loopback {student_id} is deleted successfully using restconf"
     else:
         print("Error. Status Code: {}".format(resp.status_code))
         # --- ★★★[เพิ่มใหม่]★★★: จัดการ Error กรณี Interface ไม่มีอยู่ (404 Not Found) ---
         if resp.status_code == 404:
-            return f"Cannot delete: Interface loopback {student_id}"
+            return (
+                f"Cannot delete: Interface loopback {student_id} (checked by restconf)"
+            )
         return f"Error during delete: {resp.text}"
 
 
@@ -101,7 +105,7 @@ def delete(student_id, ip_address):
 def enable(student_id, ip_address):
     # --- ★★★[เพิ่มใหม่]★★★: ตรวจสอบว่ามี Interface ก่อนหรือไม่ ---
     if "No Interface" in status(student_id, ip_address):
-        return f"Cannot enable: Interface loopback {student_id}"
+        return f"Cannot enable: Interface loopback {student_id} (checked by restconf)"
 
     # --- ★★★[เพิ่มใหม่]★★★: สร้าง URL สำหรับการแก้ไข interface (ระบุชื่อ) ---
     api_url_enable = f"https://{ip_address}/restconf/data/ietf-interfaces:interfaces/interface=Loopback{student_id}"
@@ -124,7 +128,7 @@ def enable(student_id, ip_address):
     if resp.status_code >= 200 and resp.status_code <= 299:
         print("STATUS OK: {}".format(resp.status_code))
         # --- ★★★[แก้ไข]★★★: ข้อความตอบกลับ ---
-        return f"Interface loopback {student_id} is enabled successfully"
+        return f"Interface loopback {student_id} is enabled successfully using restconf"
     else:
         print("Error. Status Code: {}".format(resp.status_code))
         return f"Error during enable: {resp.text}"
@@ -134,7 +138,7 @@ def enable(student_id, ip_address):
 def disable(student_id, ip_address):
     # --- ★★★[เพิ่มใหม่]★★★: ตรวจสอบว่ามี Interface ก่อนหรือไม่ ---
     if "No Interface" in status(student_id, ip_address):
-        return f"Cannot shutdown: Interface loopback {student_id}"
+        return f"Cannot shutdown: Interface loopback {student_id} (checked by restconf)"
 
     # --- ★★★[เพิ่มใหม่]★★★: สร้าง URL สำหรับการแก้ไข interface (ระบุชื่อ) ---
     api_url_disable = f"https://{ip_address}/restconf/data/ietf-interfaces:interfaces/interface=Loopback{student_id}"
@@ -156,7 +160,9 @@ def disable(student_id, ip_address):
     if resp.status_code >= 200 and resp.status_code <= 299:
         print("STATUS OK: {}".format(resp.status_code))
         # --- ★★★[แก้ไข]★★★: ข้อความตอบกลับ ---
-        return f"Interface loopback {student_id} is shutdowned successfully"
+        return (
+            f"Interface loopback {student_id} is shutdowned successfully using restconf"
+        )
     else:
         print("Error. Status Code: {}".format(resp.status_code))
         return f"Error during disable: {resp.text}"
@@ -191,9 +197,13 @@ def status(student_id, ip_address):
 
             # --- ★★★[แก้ไข]★★★: ข้อความตอบกลับตามสถานะ ---
             if admin_status == "up" and oper_status == "up":
-                return f"Interface loopback {student_id} is enabled"
+                return (
+                    f"Interface loopback {student_id} is enabled (checked by restconf)"
+                )
             elif admin_status == "down" and oper_status == "down":
-                return f"Interface loopback {student_id} is disabled"
+                return (
+                    f"Interface loopback {student_id} is disabled (checked by restconf)"
+                )
             else:
                 # กรณีสถานะไม่ตรงกัน (เช่น admin up แต่ oper down)
                 return f"Interface loopback {student_id} status is: admin {admin_status}, oper {oper_status}"
