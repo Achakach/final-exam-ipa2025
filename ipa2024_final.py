@@ -94,40 +94,65 @@ while True:
                     responseMessage = "OK: Restconf"
                     print(f"Method set to: {current_method}")
                 else:
-                    if current_method is None:
-                        responseMessage = "Error: No method specified"
-                    elif parts[1] in [
+                    # ถ้ามี 2 ส่วน แต่ไม่ใช่ netconf/restconf
+                    # ให้สันนิษฐานว่าตั้งใจจะรันคำสั่ง แต่พิมพ์ผิด
+                    if parts[1] in [
                         "create",
                         "delete",
                         "enable",
                         "disable",
                         "status",
+                        "gigabit_status",
+                        "showrun",
                     ]:
                         responseMessage = "Error: No IP specified"
                     else:
-                        responseMessage = "Error: No Command found"
+                        # อาจจะพิมพ์ IP แต่ไม่มีคำสั่ง
+                        # เราจะปล่อยให้โลจิกข้างล่างจับ "Error: No command specified"
+                        pass
 
+            # --- ★★★[แก้ไข โลจิกใหม่ทั้งหมด]★★★ ---
             # 2. ถ้าไม่ใช่คำสั่งตั้งค่า method ให้ตรวจสอบคำสั่งอื่น
             if responseMessage == "":
-                # 2a. ตรวจสอบว่า method ถูกตั้งค่าหรือยัง (ตามโจทย์)
-                if current_method is None:
-                    responseMessage = "Error: No method specified"
+                # 2a. ตรวจสอบรูปแบบคำสั่ง (IP + command) ก่อน
+                if len(parts) < 2:
+                    # กรณี: /66070244 (ถูกจับไปแล้วใน L85)
+                    # แต่เผื่อไว้
+                    responseMessage = "Error: Nothing specified"
+                elif len(parts) < 3:
+                    # กรณี: /66070244 10.0.15.61 (ไม่มีคำสั่ง)
+                    responseMessage = "Error: No command specified"
                 else:
-                    # 2b. Method ถูกตั้งค่าแล้ว (netconf/restconf)
-                    #     ตรวจสอบรูปแบบคำสั่ง (IP + command)
-                    if len(parts) < 2:
-                        # กรณี: /66070244
-                        responseMessage = "Error: No IP specified"
-                    elif len(parts) < 3:
-                        # กรณี: /66070244 10.0.15.61 (ไม่มีคำสั่ง)
-                        responseMessage = "Error: No command specified"
+                    # 2b. มี IP และ Command ครบถ้วน
+                    ip_address = parts[1]
+                    command_to_run = parts[2]
+
+                    # 2c. ตรวจสอบว่า command นี้ต้องใช้ method (netconf/restconf) หรือไม่
+                    netconf_restconf_commands = [
+                        "create",
+                        "delete",
+                        "enable",
+                        "disable",
+                        "status",
+                    ]
+
+                    if command_to_run in netconf_restconf_commands:
+                        # --- ถ้าใช่คำสั่งกลุ่มนี้ ค่อยเช็ค method ---
+                        if current_method is None:
+                            responseMessage = "Error: No method specified"
+                        else:
+                            # Method ถูกตั้งค่าแล้ว (OK)
+                            print(
+                                f"Attempting command: {command_to_run} on {ip_address} using {current_method}"
+                            )
                     else:
-                        # กรณี: /66070244 10.0.15.61 create (ครบถ้วน)
-                        ip_address = parts[1]
-                        command_to_run = parts[2]
+                        # --- ถ้าเป็น gigabit_status, showrun, หรือคำสั่งที่ไม่รู้จัก ---
+                        # เราจะปล่อยให้บล็อก "5. ทำงานตามคำสั่ง" (L160) ทำงาน
+                        # ซึ่งมันจะจับ 'gigabit_status', 'showrun', และ 'Error: Unknown command' เอง
                         print(
-                            f"Attempting command: {command_to_run} on {ip_address} using {current_method}"
+                            f"Attempting command: {command_to_run} on {ip_address} (Method check skipped)"
                         )
+            # --- ★★★[สิ้นสุดการแก้ไขโลจิก]★★★ ---
 
             # 5. ทำงานตามคำสั่ง (ถ้ามี)
             if command_to_run:
@@ -141,6 +166,7 @@ while True:
                     "disable",
                     "status",
                 ]:
+                    # (โลจิกส่วนนี้ทำงานต่อได้เลย เพราะผ่านการตรวจสอบ method มาแล้ว)
                     if current_method == "netconf":
                         if command_to_run == "create":
                             responseMessage = netconf_final.create(
@@ -185,11 +211,12 @@ while True:
                                 MY_STUDENT_ID, ip_address
                             )
 
-                # กลุ่มคำสั่ง Netmiko (ไม่เกี่ยวกับ method แต่ต้องตั้งค่า method ก่อน)
+                # --- ★★★[แก้ไข]★★★: ลบคอมเมนต์ว่าต้องตั้งค่า method ก่อน ---
+                # กลุ่มคำสั่ง Netmiko
                 elif command_to_run == "gigabit_status":
                     responseMessage = netmiko_final.gigabit_status(ip_address)
 
-                # กลุ่มคำสั่ง Ansible (ไม่เกี่ยวกับ method แต่ต้องตั้งค่า method ก่อน)
+                # กลุ่มคำสั่ง Ansible
                 elif command_to_run == "showrun":
                     responseMessage = ansible_final.showrun(MY_STUDENT_ID, ip_address)
 
