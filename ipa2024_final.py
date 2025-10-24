@@ -8,13 +8,16 @@ import requests
 import json
 import time
 import os
+
+from urllib3.util import response
 import netconf_final
+# import restconf_final  # <-- ★★★[เพิ่มใหม่]★★★: Import ไฟล์ restconf
 
 # --- แก้ไข: เพิ่ม import สำหรับโจทย์ส่วนที่ 2 ---
 import netmiko_final
 import ansible_final
-from requests_toolbelt.multipart.encoder import MultipartEncoder  # <-- ต้อง import ตัวนี้
-from dotenv import load_dotenv  # <-- เพิ่มเข้ามาเพื่อใช้ .env
+from requests_toolbelt.multipart.encoder import MultipartEncoder
+from dotenv import load_dotenv
 
 # --- แก้ไข: โหลดค่าจากไฟล์ .env ---
 load_dotenv()
@@ -32,6 +35,10 @@ if not ACCESS_TOKEN:
 #######################################################################################
 # 3. Main loop
 last_message_id = None
+current_method = None  # <-- ★★★[เพิ่มใหม่]★★★: ตัวแปรเก็บสถานะ (None, "netconf", "restconf")
+
+print(f"Bot started. Waiting for commands for {MY_STUDENT_ID}...")
+print(f"Current method: {current_method}")
 
 while True:
     time.sleep(1)
@@ -64,108 +71,184 @@ while True:
 
         last_message_id = current_message_id
         message = json_data["items"][0]["text"]
-        print(f"Received message: {message}")
+        print(f"\nReceived message: {message}")
 
         if message.startswith(f"/{MY_STUDENT_ID} "):
             parts = message.split()
             ip_address = None
-            command = None
-            responseMessage = ""  # <-- ★★★[แก้ไข]★★★: เริ่มต้นตัวแปรไว้ก่อน
+            command_to_run = None  # <-- ตัวแปรเก็บคำสั่งที่จะรัน
+            responseMessage = ""  # <-- รีเซ็ตข้อความตอบกลับ
 
-            # --- ★★★[แก้ไข]★★★: Logic การตรวจสอบคำสั่งใหม่ ---
-            if len(parts) < 2:
-                # กรณี: /66070244 (มีแค่ 1 ส่วน)
-                responseMessage = "Error: No IP specified"
-            elif len(parts) < 3:
-                # กรณี: /66070244 10.0.15.61 (มี 2 ส่วน)
-                # หรือ /66070244 create (มี 2 ส่วน)
+            # --- ★★★[แก้ไข]★★★: Logic การตรวจสอบคำสั่งใหม่ทั้งหมด ---
 
-                # ตรวจสอบว่าส่วนที่ 2 เป็นคำสั่งหรือไม่
-                potential_command = parts[1]
-                if potential_command in [
+            # 1. ตรวจสอบคำสั่ง 'ตั้งค่า method' ก่อน (ทำงานได้เสมอ)
+            if len(parts) == 1:
+                responseMessage = "Error: Nothing specified"
+            elif len(parts) == 2:
+                if parts[1] == "netconf":
+                    current_method = "netconf"
+                    responseMessage = "OK: Netconf"
+                    print(f"Method set to: {current_method}")
+                elif parts[1] == "restconf":
+                    current_method = "restconf"
+                    responseMessage = "OK: Restconf"
+                    print(f"Method set to: {current_method}")
+                else:
+                    if current_method is None:
+                        responseMessage = "Error: No method specified"
+                    elif parts[1] in [
+                        "create",
+                        "delete",
+                        "enable",
+                        "disable",
+                        "status",
+                    ]:
+                        responseMessage = "Error: No IP specified"
+                    else:
+                        responseMessage = "Error: No Command found"
+
+            # 2. ถ้าไม่ใช่คำสั่งตั้งค่า method ให้ตรวจสอบคำสั่งอื่น
+            if responseMessage == "":
+                # 2a. ตรวจสอบว่า method ถูกตั้งค่าหรือยัง (ตามโจทย์)
+                if current_method is None:
+                    responseMessage = "Error: No method specified"
+                else:
+                    # 2b. Method ถูกตั้งค่าแล้ว (netconf/restconf)
+                    #     ตรวจสอบรูปแบบคำสั่ง (IP + command)
+                    if len(parts) < 2:
+                        # กรณี: /66070244
+                        responseMessage = "Error: No IP specified"
+                    elif len(parts) < 3:
+                        # กรณี: /66070244 10.0.15.61 (ไม่มีคำสั่ง)
+                        responseMessage = "Error: No command specified"
+                    else:
+                        # กรณี: /66070244 10.0.15.61 create (ครบถ้วน)
+                        ip_address = parts[1]
+                        command_to_run = parts[2]
+                        print(
+                            f"Attempting command: {command_to_run} on {ip_address} using {current_method}"
+                        )
+
+            # 5. ทำงานตามคำสั่ง (ถ้ามี)
+            if command_to_run:
+                # --- ★★★[เพิ่มใหม่]★★★: แยกการทำงานตาม current_method ---
+
+                # กลุ่มคำสั่ง Netconf/Restconf
+                if command_to_run in [
                     "create",
                     "delete",
                     "enable",
                     "disable",
                     "status",
-                    "gigabit_status",
-                    "showrun",
                 ]:
-                    responseMessage = "Error: No IP specified"
+                    if current_method == "netconf":
+                        if command_to_run == "create":
+                            responseMessage = netconf_final.create(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "delete":
+                            responseMessage = netconf_final.delete(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "enable":
+                            responseMessage = netconf_final.enable(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "disable":
+                            responseMessage = netconf_final.disable(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "status":
+                            responseMessage = netconf_final.status(
+                                MY_STUDENT_ID, ip_address
+                            )
+
+                    elif current_method == "restconf":
+                        if command_to_run == "create":
+                            responseMessage = restconf_final.create(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "delete":
+                            responseMessage = restconf_final.delete(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "enable":
+                            responseMessage = restconf_final.enable(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "disable":
+                            responseMessage = restconf_final.disable(
+                                MY_STUDENT_ID, ip_address
+                            )
+                        elif command_to_run == "status":
+                            responseMessage = restconf_final.status(
+                                MY_STUDENT_ID, ip_address
+                            )
+
+                # กลุ่มคำสั่ง Netmiko (ไม่เกี่ยวกับ method แต่ต้องตั้งค่า method ก่อน)
+                elif command_to_run == "gigabit_status":
+                    responseMessage = netmiko_final.gigabit_status(ip_address)
+
+                # กลุ่มคำสั่ง Ansible (ไม่เกี่ยวกับ method แต่ต้องตั้งค่า method ก่อน)
+                elif command_to_run == "showrun":
+                    responseMessage = ansible_final.showrun(MY_STUDENT_ID, ip_address)
+
+                # ไม่รู้จักคำสั่ง
                 else:
-                    # ถ้าไม่ใช่คำสั่ง ก็ถือว่าเป็น IP
-                    responseMessage = "Error: No method specified"
-            else:
-                # กรณี: /66070244 10.0.15.61 create (มี 3 ส่วนขึ้นไป)
-                ip_address = parts[1]
-                command = parts[2]
-                print(f"Executing command: {command} on IP: {ip_address}")
-
-            # 5. Complete the logic for each command
-            # --- ★★★[แก้ไข]★★★: ส่ง ip_address เข้าไปในฟังก์ชัน ---
-
-            # ทำงานต่อเมื่อ command ถูกกำหนดค่า (ไม่มี Error จากด้านบน)
-            if command == "create":
-                responseMessage = netconf_final.create(MY_STUDENT_ID, ip_address)
-            elif command == "delete":
-                responseMessage = netconf_final.delete(MY_STUDENT_ID, ip_address)
-            elif command == "enable":
-                responseMessage = netconf_final.enable(MY_STUDENT_ID, ip_address)
-            elif command == "disable":
-                responseMessage = netconf_final.disable(MY_STUDENT_ID, ip_address)
-            elif command == "status":
-                responseMessage = netconf_final.status(MY_STUDENT_ID, ip_address)
-            elif command == "gigabit_status":
-                responseMessage = netmiko_final.gigabit_status(ip_address)
-            elif command == "showrun":
-                responseMessage = ansible_final.showrun(MY_STUDENT_ID, ip_address)
-            elif command is not None:
-                # ถ้ามี command แต่ไม่ตรงกับอันไหนเลย
-                responseMessage = "Error: Unknown command"
+                    responseMessage = "Error: Unknown command"
 
             # 6. Post the message to the Webex Teams room
             postHTTPHeaders = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
 
-            if command == "showrun" and "ok=2" in responseMessage:
-                filename = f"show_run_{MY_STUDENT_ID}_CSR1000v.txt"
-                try:
-                    with open(filename, "rb") as file_content:
-                        multipart_data = MultipartEncoder(
-                            fields={
-                                "roomId": WEBEX_ROOM_ID,
-                                "text": f"Show running-config for {MY_STUDENT_ID} on {ip_address}",  # <-- เพิ่ม IP ในข้อความ
-                                "files": (filename, file_content, "text/plain"),
-                            }
+            # --- ★★★[แก้ไข]★★★: ตรวจสอบว่า responseMessage 'มี' ข้อความหรือไม่
+            if responseMessage:
+                if command_to_run == "showrun" and "ok=2" in responseMessage:
+                    filename = f"show_run_{MY_STUDENT_ID}_CSR1000v.txt"
+                    try:
+                        with open(filename, "rb") as file_content:
+                            multipart_data = MultipartEncoder(
+                                fields={
+                                    "roomId": WEBEX_ROOM_ID,
+                                    "text": f"Show running-config for {MY_STUDENT_ID} on {ip_address}",
+                                    "files": (filename, file_content, "text/plain"),
+                                }
+                            )
+                            postHTTPHeaders["Content-Type"] = (
+                                multipart_data.content_type
+                            )
+                            r_post = requests.post(
+                                "https://webexapis.com/v1/messages",
+                                data=multipart_data,
+                                headers=postHTTPHeaders,
+                            )
+                    except FileNotFoundError:
+                        responseMessage = (
+                            f"Error: Ansible ran, but file '{filename}' was not found."
                         )
-                        postHTTPHeaders["Content-Type"] = multipart_data.content_type
+                        # --- ส่ง Error นี้เป็นข้อความปกติแทน ---
+                        postData = {"roomId": WEBEX_ROOM_ID, "text": responseMessage}
+                        postHTTPHeaders["Content-Type"] = "application/json"
                         r_post = requests.post(
                             "https://webexapis.com/v1/messages",
-                            data=multipart_data,
+                            data=json.dumps(postData),
                             headers=postHTTPHeaders,
                         )
-                except FileNotFoundError:
-                    responseMessage = (
-                        f"Error: Ansible ran, but file '{filename}' was not found."
+
+                # --- ★★★[แก้ไข]★★★: ส่งข้อความตอบกลับ (ที่ไม่ใช่ไฟล์)
+                # ตรวจสอบว่า *ไม่ใช่* showrun ที่สำเร็จ (เพราะส่งเป็นไฟล์ไปแล้ว)
+                if not (command_to_run == "showrun" and "ok=2" in responseMessage):
+                    postData = {"roomId": WEBEX_ROOM_ID, "text": responseMessage}
+                    postHTTPHeaders["Content-Type"] = "application/json"
+                    r_post = requests.post(
+                        "https://webexapis.com/v1/messages",
+                        data=json.dumps(postData),
+                        headers=postHTTPHeaders,
                     )
 
-            # --- ★★★[แก้ไข]★★★: ปรับเงื่อนไขการส่งข้อความ
-            # ถ้า responseMessage ไม่ว่าง (มี Error หรือมีผลลัพธ์)
-            # และ (ไม่ใช่คำสั่ง showrun ที่สำเร็จ)
-            if responseMessage and not (
-                command == "showrun" and "ok=2" in responseMessage
-            ):
-                postData = {"roomId": WEBEX_ROOM_ID, "text": responseMessage}
-                postHTTPHeaders["Content-Type"] = "application/json"
-                r_post = requests.post(
-                    "https://webexapis.com/v1/messages",
-                    data=json.dumps(postData),
-                    headers=postHTTPHeaders,
-                )
-
-            if "r_post" in locals() and not r_post.status_code == 200:
-                print(
-                    f"Error posting message to Webex. Status: {r_post.status_code}, Details: {r_post.text}"
-                )
+                if "r_post" in locals() and not r_post.status_code == 200:
+                    print(
+                        f"Error posting message to Webex. Status: {r_post.status_code}, Details: {r_post.text}"
+                    )
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
