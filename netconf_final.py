@@ -68,10 +68,14 @@ def create(student_id, ip_address):
             if m is None:
                 return f"Error: Could not connect to the router at {ip_address}."
             m.edit_config(target="running", config=netconf_config)
-            return f"Interface loopback {student_id} is created successfully"
+            return (
+                f"Interface loopback {student_id} is created successfully using netconf"
+            )
     except Exception as e:
         if "data-exists" in str(e):
-            return f"Cannot create: Interface loopback {student_id}"
+            return (
+                f"Cannot create: Interface loopback {student_id} (checked by netconf)"
+            )
         return f"Error during create: {e}"
 
 
@@ -91,10 +95,14 @@ def delete(student_id, ip_address):
             if m is None:
                 return f"Error: Could not connect to the router at {ip_address}."
             m.edit_config(target="running", config=netconf_config)
-            return f"Interface loopback {student_id} is deleted successfully"
+            return (
+                f"Interface loopback {student_id} is deleted successfully using netconf"
+            )
     except Exception as e:
         if "data-missing" in str(e):
-            return f"Cannot delete: Interface loopback {student_id}"
+            return (
+                f"Cannot delete: Interface loopback {student_id} (checked by netconf)"
+            )
         return f"Error during delete: {e}"
 
 
@@ -112,13 +120,15 @@ def enable(student_id, ip_address):
     """
     # ★★★[แก้ไข]★★★: ส่ง ip_address ไปให้ฟังก์ชัน status
     if "No Interface" in status(student_id, ip_address):
-        return f"Cannot enable: Interface loopback {student_id}"
+        return f"Cannot enable: Interface loopback {student_id} (checked by netconf)"
     try:
         with connect_to_router(ip_address) as m:  # <-- ★★★[แก้ไข]★★★
             if m is None:
                 return f"Error: Could not connect to the router at {ip_address}."
             m.edit_config(target="running", config=netconf_config)
-            return f"Interface loopback {student_id} is enabled successfully"
+            return (
+                f"Interface loopback {student_id} is enabled successfully using netconf"
+            )
     except Exception as e:
         return f"Error during enable: {e}"
 
@@ -137,13 +147,13 @@ def disable(student_id, ip_address):
     """
     # ★★★[แก้ไข]★★★: ส่ง ip_address ไปให้ฟังก์ชัน status
     if "No Interface" in status(student_id, ip_address):
-        return f"Cannot shutdown: Interface loopback {student_id}"
+        return f"Cannot shutdown: Interface loopback {student_id} (checked by netconf)"
     try:
         with connect_to_router(ip_address) as m:  # <-- ★★★[แก้ไข]★★★
             if m is None:
                 return f"Error: Could not connect to the router at {ip_address}."
             m.edit_config(target="running", config=netconf_config)
-            return f"Interface loopback {student_id} is shutdowned successfully"
+            return f"Interface loopback {student_id} is shutdowned successfully using netconf"
     except Exception as e:
         return f"Error during disable: {e}"
 
@@ -180,12 +190,12 @@ def status(student_id, ip_address):
                 oper_status = interface_data.get("oper-status")
 
                 if admin_status == "up" and oper_status == "up":
-                    return f"Interface loopback {student_id} is enabled"
+                    return f"Interface loopback {student_id} is enabled (checked by netconf)"
                 elif admin_status == "down" and oper_status == "down":
-                    return f"Interface loopback {student_id} is disabled"
+                    return f"Interface loopback {student_id} is disabled (checked by netconf)"
             else:
-                return f"No Interface loopback {student_id}"
+                return f"No Interface loopback {student_id} (checked by netconf)"
     except (ParseError, AttributeError):
-        return f"No Interface loopback {student_id}"
+        return f"No Interface loopback {student_id} (checked by netconf)"
     except Exception as e:
         return f"Error during status check: {e}"
