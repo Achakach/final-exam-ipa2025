@@ -41,7 +41,7 @@ print(f"Bot started. Waiting for commands for {MY_STUDENT_ID}...")
 print(f"Current method: {current_method}")
 
 while True:
-    time.sleep(0.2)
+    time.sleep(0.1)
     getParameters = {"roomId": WEBEX_ROOM_ID, "max": 1}
     getHTTPHeader = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
 
@@ -96,6 +96,7 @@ while True:
                 else:
                     # ถ้ามี 2 ส่วน แต่ไม่ใช่ netconf/restconf
                     # ให้สันนิษฐานว่าตั้งใจจะรันคำสั่ง แต่พิมพ์ผิด
+                    # --- ★★★[แก้ไข]★★★: เพิ่ม 'motd' ใน list นี้ ---
                     if parts[1] in [
                         "create",
                         "delete",
@@ -104,6 +105,7 @@ while True:
                         "status",
                         "gigabit_status",
                         "showrun",
+                        "motd",  # <-- เพิ่ม motd ที่นี่
                     ]:
                         responseMessage = "Error: No IP specified"
                     else:
@@ -146,9 +148,9 @@ while True:
                                 f"Attempting command: {command_to_run} on {ip_address} using {current_method}"
                             )
                     else:
-                        # --- ถ้าเป็น gigabit_status, showrun, หรือคำสั่งที่ไม่รู้จัก ---
+                        # --- ถ้าเป็น gigabit_status, showrun, motd หรือคำสั่งที่ไม่รู้จัก ---
                         # เราจะปล่อยให้บล็อก "5. ทำงานตามคำสั่ง" (L160) ทำงาน
-                        # ซึ่งมันจะจับ 'gigabit_status', 'showrun', และ 'Error: Unknown command' เอง
+                        # ซึ่งมันจะจับ 'gigabit_status', 'showrun', 'motd' และ 'Error: Unknown command' เอง
                         print(
                             f"Attempting command: {command_to_run} on {ip_address} (Method check skipped)"
                         )
@@ -215,6 +217,11 @@ while True:
                 # กลุ่มคำสั่ง Netmiko
                 elif command_to_run == "gigabit_status":
                     responseMessage = netmiko_final.gigabit_status(ip_address)
+
+                # --- ★★★[เพิ่มใหม่]★★★: เพิ่มการเรียกใช้ motd ---
+                elif command_to_run == "motd":
+                    responseMessage = netmiko_final.get_motd(ip_address)
+                # --- ★★★[สิ้นสุดการเพิ่มใหม่]★★★
 
                 # กลุ่มคำสั่ง Ansible
                 elif command_to_run == "showrun":

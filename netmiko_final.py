@@ -67,3 +67,46 @@ def gigabit_status(ip_address):
         )
         pprint(error_message)
         return error_message
+
+
+# --- ★★★[เพิ่มใหม่]★★★: ฟังก์ชันสำหรับอ่าน MOTD โดยใช้ TextFSM ---
+def get_motd(ip_address):
+    """
+    Retrieves the MOTD banner from the router using Netmiko and TextFSM.
+    """
+    device_params = {
+        "device_type": "cisco_xe",
+        "ip": ip_address,
+        "username": username,
+        "password": password,
+    }
+
+    try:
+        with ConnectHandler(**device_params) as ssh:
+            # เราใช้ show running-config เพราะ ntc_templates มี
+            # template สำหรับคำสั่งนี้ที่สามารถดึง 'banner_motd' ได้
+            command = "show running-config"
+
+            # use_textfsm=True จะใช้ ntc_templates เพื่อแยกส่วน
+            result = ssh.send_command(command, use_textfsm=True)
+
+            if isinstance(result, dict):
+                # TextFSM จะคืนค่า dict และเราดึงคีย์ 'banner_motd'
+                motd_message = result.get("banner_motd")
+
+                if motd_message:
+                    # คืนค่าเฉพาะข้อความ MOTD
+                    return motd_message
+                else:
+                    return "Error: No MOTD Configured"
+            else:
+                # กรณี TextFSM ไม่สามารถ parse ได้ (ไม่น่าเกิด)
+                return f"Error: Could not parse running-config from {ip_address}."
+
+    except Exception as e:
+        error_message = f"An unexpected error occurred in get_motd on {ip_address}: {e}"
+        pprint(error_message)
+        return error_message
+
+
+# --- ★★★[สิ้นสุดการเพิ่มใหม่]★★★
