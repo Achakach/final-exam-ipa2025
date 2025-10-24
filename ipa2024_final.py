@@ -11,7 +11,7 @@ import os
 
 from urllib3.util import response
 import netconf_final
-# import restconf_final  # <-- ★★★[เพิ่มใหม่]★★★: Import ไฟล์ restconf
+import restconf_final  # <-- ★★★[เพิ่มใหม่]★★★: Import ไฟล์ restconf
 
 # --- แก้ไข: เพิ่ม import สำหรับโจทย์ส่วนที่ 2 ---
 import netmiko_final
